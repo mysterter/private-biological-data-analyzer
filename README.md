@@ -8,6 +8,10 @@ Research datasets can contain confidential specimen records, unpublished measure
 
 The public repository contains only synthetic demonstration data. The application has also been used locally with a confidential biological research dataset, but no private records, identifiers, or unpublished findings are included here.
 
+## Application Preview
+
+![Private Biological Data Analyzer using synthetic demonstration data](screenshots/analyzer-demo.png)
+
 ## Key Features
 
 - Runs locally in a modern browser
