@@ -1,0 +1,157 @@
+/* app.css — all styling for the analyzer. Kept in a file rather than inline so
+   the Content-Security-Policy does not need to allow inline styles. */
+
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #15202b;
+  background: #f4f7fa;
+}
+
+body { margin: 0; }
+
+header {
+  background: #fff;
+  border-bottom: 1px solid #d9e1e8;
+  padding: 22px 24px;
+}
+
+main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+h1 { font-size: 1.65rem; margin: 0 0 8px; }
+h2 { font-size: 1.2rem; margin-top: 0; }
+h3 { font-size: 1rem; margin: 22px 0 8px; }
+
+.card {
+  background: #fff;
+  border: 1px solid #d9e1e8;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .035);
+}
+
+.privacy { border-left: 5px solid #2b7a4b; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+label { display: flex; flex-direction: column; gap: 6px; font-weight: 650; font-size: .92rem; }
+
+select, input[type=file], button { font: inherit; }
+
+select, input[type=file] {
+  padding: 10px;
+  border: 1px solid #b9c4ce;
+  border-radius: 9px;
+  background: #fff;
+}
+
+button {
+  padding: 11px 15px;
+  border: 0;
+  border-radius: 9px;
+  background: #1769aa;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  margin: 4px 8px 4px 0;
+}
+
+button.secondary { background: #586774; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+.small { font-size: .88rem; color: #53616e; }
+.status { font-weight: 700; margin-top: 10px; }
+.good { color: #1f6d42; }
+.warn { color: #a45b00; }
+.bad { color: #a22828; }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.metric {
+  background: #f6f9fb;
+  border: 1px solid #dae3ea;
+  padding: 13px;
+  border-radius: 10px;
+  font-size: .88rem;
+  color: #53616e;
+}
+
+.metric b { display: block; font-size: 1.3rem; margin-top: 4px; color: #15202b; }
+
+table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+th, td { padding: 8px; border-bottom: 1px solid #e4e9ee; text-align: left; }
+th { background: #f6f9fb; position: sticky; top: 0; }
+td.numeric, th.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+
+.tablewrap {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid #dfe6ec;
+  border-radius: 10px;
+}
+
+canvas {
+  width: 100%;
+  height: 420px;
+  border: 1px solid #dfe6ec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.hidden { display: none; }
+
+code { background: #eef3f7; padding: 2px 5px; border-radius: 5px; }
+
+/* Analysis-plan controls */
+.plan-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.checklist {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #dfe6ec;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fcfdfe;
+}
+
+.checklist label,
+.inline-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  padding: 3px 0;
+}
+
+.checklist .muted { color: #7c8894; font-weight: 400; }
+
+.fieldset-title { font-weight: 700; font-size: .92rem; margin-bottom: 6px; display: block; }
+
+.note {
+  background: #f6f9fb;
+  border: 1px solid #dae3ea;
+  border-left: 4px solid #1769aa;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  font-size: .88rem;
+}
+
+.note.caution { border-left-color: #a45b00; }
+
+ul.plain { margin: 6px 0; padding-left: 20px; font-size: .88rem; color: #53616e; }
+
+.actions { margin-top: 15px; }

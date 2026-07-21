@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; media-src 'none'">
+<title>Analyzer tests</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header>
+<h1>Private Biological CSV Analyzer — tests</h1>
+<div class="small">Double-click this file to check that the tool still behaves correctly on this machine. No server, no network, no installation.</div>
+</header>
+<main>
+<section class="card privacy">
+<h2>What is checked here</h2>
+<p class="small">These are the same test cases that <code>node tests/run-tests.js</code> runs: CSV quoting, missing required values, duplicate identifiers, nonpositive measurements, organ masses above body mass, the GSI and HSI calculations, the regression maths, the analysis plan, and the network kill switch.</p>
+<p class="small">Two groups of checks are missing here because a page opened by double-clicking is not allowed to read files on its own: the end-to-end pass over <code>synthetic_example.csv</code> and the scan of the source files for network references. Both run in the command-line runner.</p>
+</section>
+<section class="card">
+<h2>Results</h2>
+<div id="results"></div>
+</section>
+</main>
+
+<script src="js/privacy.js"></script>
+<script src="js/csv.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/validate.js"></script>
+<script src="js/analysis.js"></script>
+<script src="tests/harness.js"></script>
+<script src="tests/test-cases.js"></script>
+<script src="tests/browser-runner.js"></script>
+</body>
+</html>

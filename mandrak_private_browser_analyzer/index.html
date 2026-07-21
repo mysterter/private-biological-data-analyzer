@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!--
+  The policy below is the first privacy safeguard: connect-src 'none' means the
+  page cannot open a network connection of any kind, and default-src 'none'
+  means no external stylesheet, font, image or script can be loaded. Only files
+  sitting next to this one are allowed to run. js/privacy.js enforces the same
+  rule a second time at runtime.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; media-src 'none'">
+<title>Private Biological CSV Analyzer</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header>
+<h1>Private Biological CSV Analyzer</h1>
+<div class="small">Standalone local tool for validation, descriptive summaries, and a user-specified regression. Runs entirely inside this browser tab.</div>
+</header>
+<main>
+
+<section class="card privacy">
+<h2>Privacy</h2>
+<p>This page processes your CSV entirely inside this browser tab. It contains no analytics, network calls, cloud uploads, or external libraries, and it reads no file other than the one you pick below. Closing or refreshing the page clears the loaded data from memory.</p>
+<p><strong>Do not place the private CSV in a GitHub repository.</strong> Keep the analyzer and the data in separate folders.</p>
+<div id="privacyStatus" class="small"></div>
+</section>
+
+<section class="card" id="stepFile">
+<h2>1. Select a CSV</h2>
+<input id="fileInput" type="file" accept=".csv,text/csv">
+<div id="fileStatus" class="status small">No file selected.</div>
+<div id="parseWarnings"></div>
+</section>
+
+<section class="card hidden" id="stepMapping">
+<h2>2. Map your columns</h2>
+<p class="small">Only the first three mappings are required. Optional variables unlock additional checks, the GSI and HSI indices, and grouped summaries.</p>
+<div id="mappingGrid" class="grid"></div>
+<div class="actions">
+<button id="toPlanBtn">Continue to analysis plan</button>
+<button id="clearBtn" class="secondary">Clear data</button>
+</div>
+<div id="mappingStatus" class="status small"></div>
+</section>
+
+<section class="card hidden" id="stepPlan">
+<h2>3. Analysis plan</h2>
+<p class="small">Choose what should be computed. Nothing here is decided for you beyond an editable starting point, and the plan is reported alongside the results.</p>
+<div class="plan-columns">
+  <div>
+    <span class="fieldset-title">Grouping fields</span>
+    <div class="small">Summaries are reported for each combination of the fields you tick.</div>
+    <div id="planGroups" class="checklist"></div>
+  </div>
+  <div>
+    <span class="fieldset-title">Outcome variable</span>
+    <div class="small">The variable to be explained by the model.</div>
+    <label for="planOutcome"><select id="planOutcome"></select></label>
+    <span class="fieldset-title">Transformation</span>
+    <label class="inline-check" for="planLog">
+      <input type="checkbox" id="planLog" checked>
+      Log-transform positive numeric variables
+    </label>
+    <div class="small">A variable containing zero or negative values is left on its original scale and reported; no rows are dropped to make a logarithm possible.</div>
+  </div>
+  <div>
+    <span class="fieldset-title">Predictor variables</span>
+    <div class="small">One or more numeric variables used to predict the outcome.</div>
+    <div id="planPredictors" class="checklist"></div>
+  </div>
+</div>
+<div class="actions">
+<button id="runBtn">Run local analysis</button>
+<button id="backToMappingBtn" class="secondary">Back to column mapping</button>
+</div>
+<div id="planStatus" class="status small"></div>
+</section>
+
+<section class="card hidden" id="stepResults">
+<h2>4. Results</h2>
+<div id="metrics" class="metrics"></div>
+<div id="planEcho"></div>
+
+<h3>Validation summary</h3>
+<div class="small">Flagged values are kept, never removed. Review each one locally and decide whether to correct, retain, or exclude it.</div>
+<div class="tablewrap"><table id="validationTable"></table></div>
+
+<h3>Flagged rows</h3>
+<div class="tablewrap"><table id="flaggedTable"></table></div>
+
+<h3>Model</h3>
+<div id="modelText"></div>
+<div class="tablewrap"><table id="modelTable"></table></div>
+<canvas id="plot" width="1000" height="420"></canvas>
+<div id="plotCaption" class="small"></div>
+
+<h3>Grouped summary</h3>
+<div class="tablewrap"><table id="groupTable"></table></div>
+
+<div class="actions">
+<button id="downloadValidation">Download flagged-row report</button>
+<button id="downloadSummary">Download aggregate summary</button>
+<button id="backToPlanBtn" class="secondary">Change the analysis plan</button>
+</div>
+</section>
+
+</main>
+
+<!-- Classic scripts, deliberately not ES modules: a double-clicked file:// page
+     cannot load ES modules, but it can load these. Order matters. -->
+<script src="js/privacy.js"></script>
+<script src="js/csv.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/validate.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
