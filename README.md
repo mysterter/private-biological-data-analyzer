@@ -6,6 +6,10 @@ A local tool for checking a biological specimen CSV and computing descriptive
 summaries and a regression you specify yourself. It runs in a browser tab on
 your own machine. Nothing is uploaded, and no internet connection is used.
 
+## Application Preview
+
+![Private Biological CSV Analyzer using synthetic demonstration data](screenshots/analyzer-demo.png)
+
 ## Easiest use
 
 1. Unzip this folder.
