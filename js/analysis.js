@@ -16,6 +16,11 @@
 
   var PBA = (root.PBA = root.PBA || {});
 
+  /* Small-group suppression threshold. A group holding fewer records than this
+     is not reported individually, because a summary of very few specimens can
+     identify them. */
+  var MIN_GROUP_SIZE = 5;
+
   /* Derived variables are addressed with a "@" prefix so that they can never
      collide with a real column called "gsi" or "hsi". */
   var DERIVED = {
@@ -232,6 +237,45 @@
   }
 
   /**
+   * Withhold groups that hold fewer than `threshold` records.
+   *
+   * Small groups are removed entirely rather than shown with blanked-out
+   * statistics: the label itself is identifying. Grouping by specimen ID, for
+   * example, produces one group per animal, and a redacted row would still
+   * publish the identifier. What remains is a count of how many groups and how
+   * many records were withheld, so the reader knows the table is incomplete and
+   * by how much.
+   *
+   * This never affects the model, which is fitted from individual records.
+   */
+  function suppressSmallGroups(groups, threshold) {
+    var limit = threshold === undefined ? MIN_GROUP_SIZE : threshold;
+    var kept = [];
+    var suppressedGroupCount = 0;
+    var suppressedRecordCount = 0;
+
+    groups.summaries.forEach(function (summary) {
+      if (summary.n >= limit) {
+        kept.push(summary);
+      } else {
+        suppressedGroupCount += 1;
+        suppressedRecordCount += summary.n;
+      }
+    });
+
+    return {
+      variables: groups.variables,
+      threshold: limit,
+      summaries: kept,
+      suppressedGroupCount: suppressedGroupCount,
+      suppressedRecordCount: suppressedRecordCount,
+      note: "Groups with fewer than " + limit + " records are withheld, " +
+            "including their labels. Reported group counts therefore need not " +
+            "add up to the total number of rows."
+    };
+  }
+
+  /**
    * Run a plan against the records.
    * Returns the fitted model, the group summaries, the transform decisions and
    * a full account of which rows could not be used and why.
@@ -323,8 +367,10 @@
   }
 
   PBA.analysis = {
+    MIN_GROUP_SIZE: MIN_GROUP_SIZE,
     DERIVED: DERIVED,
     isDerived: isDerived,
+    suppressSmallGroups: suppressSmallGroups,
     variableLabel: variableLabel,
     variableValue: variableValue,
     columnValues: columnValues,

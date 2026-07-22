@@ -15,7 +15,7 @@
 <main>
 <section class="card privacy">
 <h2>What is checked here</h2>
-<p class="small">These are the same test cases that <code>node tests/run-tests.js</code> runs: CSV quoting, missing required values, duplicate identifiers, nonpositive measurements, organ masses above body mass, the GSI and HSI calculations, the regression maths, the analysis plan, and the network kill switch.</p>
+<p class="small">These are the same test cases that <code>node tests/run-tests.js</code> runs: CSV quoting, missing required values, duplicate identifiers, nonpositive measurements, organ masses above body mass, the GSI and HSI calculations, the regression maths, the analysis plan, the network kill switch, and the governance report — that its exports carry no specimen identifiers, that small groups are suppressed, that missingness is computed correctly, and that identical inputs produce identical output.</p>
 <p class="small">Two groups of checks are missing here because a page opened by double-clicking is not allowed to read files on its own: the end-to-end pass over <code>synthetic_example.csv</code> and the scan of the source files for network references. Both run in the command-line runner.</p>
 </section>
 <section class="card">
@@ -29,8 +29,10 @@
 <script src="js/stats.js"></script>
 <script src="js/validate.js"></script>
 <script src="js/analysis.js"></script>
+<script src="js/report.js"></script>
 <script src="tests/harness.js"></script>
 <script src="tests/test-cases.js"></script>
+<script src="tests/report-cases.js"></script>
 <script src="tests/browser-runner.js"></script>
 </body>
 </html>

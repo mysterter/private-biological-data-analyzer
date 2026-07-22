@@ -1,128 +1,186 @@
-# Private Biological Data Analyzer
+# Private Biological CSV Analyzer
 
-A privacy-focused browser application for validating and exploring biological CSV datasets entirely on the user's device.
+A local tool for checking a biological specimen CSV and computing descriptive
+summaries and a regression you specify yourself. It runs in a browser tab on
+your own machine. Nothing is uploaded, and no internet connection is used.
 
-## Overview
+## Easiest use
 
-Research datasets can contain confidential specimen records, unpublished measurements, and project-specific identifiers. This application performs CSV parsing, validation, visualization, and exploratory analysis inside the browser without sending records to a server.
+1. Unzip this folder.
+2. Double-click `index.html`.
+3. Select your CSV.
+4. Map the requested columns.
+5. Choose an analysis plan.
+6. Click **Run local analysis**.
+7. Optionally fill in the project-information form, then generate the
+   governance and reproducibility report and download it as JSON or as a
+   standalone HTML file.
 
-The public repository contains only synthetic demonstration data. The application has also been used locally with a confidential biological research dataset, but no private records, identifiers, or unpublished findings are included here.
+No Python, terminal, package installation, account, or internet connection is
+required.
 
-## Application Preview
+Keep the whole folder together. `index.html` loads its code from the `js/` and
+`css/` folders next to it, so moving `index.html` on its own will not work.
 
-![Private Biological Data Analyzer using synthetic demonstration data](screenshots/analyzer-demo.png)
+## Privacy
 
-## Key Features
+The analyzer never sends anything anywhere. Three separate measures enforce it:
 
-- Runs locally in a modern browser
-- No server, account, cloud upload, or external analytics
-- Configurable mapping between CSV columns and analysis fields
-- Duplicate specimen-identifier detection
-- Missing, nonnumeric, and nonpositive-value checks
-- Biological consistency checks, including organ mass versus total body mass
-- Gonadosomatic and hepatosomatic index calculations when required fields are present
-- Grouped descriptive summaries
-- Exploratory log body-mass versus log length regression
-- Browser-generated visualization
-- Downloadable validation and aggregate-summary reports
-- Synthetic CSV included for safe demonstration
+- **No external references.** Every script, style and font is a local file.
+  There are no CDNs, libraries, trackers or analytics of any kind.
+- **A content security policy** in `index.html` declares `connect-src 'none'`
+  and `default-src 'none'`, so the browser itself refuses to open a network
+  connection or load a remote resource from this page.
+- **A runtime kill switch** (`js/privacy.js`, loaded before everything else)
+  disables `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`,
+  `RTCPeerConnection` and `navigator.sendBeacon`, and records any attempt to
+  use them. The count is shown at the top of the page.
 
-## Privacy Design
+The only file the tool reads is the one you pick in the file dialog. There is
+no drag-and-drop folder scan, no directory picker and no "recent files" list.
+Nothing is written to `localStorage`, `sessionStorage`, cookies or IndexedDB, so
+closing or refreshing the tab clears the loaded data from memory.
 
-The selected CSV is processed in browser memory. The application does not intentionally transmit data to a remote service.
+Downloads are generated in memory and saved by your own browser to your own
+disk. Two further safeguards apply to what those files can contain:
 
-Recommended practice:
+- **Small groups are withheld.** A group summary covering fewer than five
+  records is not reported — on screen or in any export — and neither is its
+  label, since a label such as a specimen ID would identify the group by
+  itself. What remains is a count of how many groups and records were withheld.
+  This never changes the model, which is fitted from individual records.
+- **File names are never exported.** The name of the CSV you opened is shown on
+  screen but is deliberately not passed to any report builder, so it cannot
+  reach a file you might share.
 
-1. Keep confidential datasets outside the repository folder.
-2. Use the included synthetic dataset for public demonstrations.
-3. Do not commit generated row-level reports.
-4. Close or refresh the browser tab after private analysis.
-5. Verify repository contents before every public commit.
+The only export that contains specimen identifiers is the flagged-row report,
+which exists precisely so you can find and check those rows locally. The
+governance report and the aggregate summary contain neither identifiers nor
+individual values.
 
-## Try the Demonstration
+**Do not place the private CSV in a GitHub repository.** Keep the analyzer and
+the data in separate folders.
 
-1. Download or clone the repository.
-2. Open `index.html` in a browser.
-3. Select `synthetic_example.csv`.
-4. Confirm or change the column mappings.
-5. Select **Run local analysis**.
-6. Review the validation summary, visualization, and grouped statistics.
+## What it checks
 
-No package installation is required for the standalone version.
+Questionable values are **flagged and kept**. The tool never deletes, corrects
+or silently drops a row — that decision belongs to the person who collected the
+data.
 
-## Example Workflow
+| Check | Severity |
+| --- | --- |
+| Missing required value (specimen ID, length, body mass) | error |
+| Non-numeric measurement | error / warning |
+| Zero or negative measurement | error / warning |
+| Duplicate specimen identifier | warning |
+| Organ mass greater than body mass | warning |
+| Organ mass greater than somatic mass (index above 100%) | warning |
 
-```text
-Select CSV
-    ↓
-Map columns
-    ↓
-Validate records
-    ↓
-Create derived measures
-    ↓
-Generate summaries and visualization
-    ↓
-Download local reports
-```
+"Error" means the value cannot be used in a calculation; "warning" means it is
+arithmetically usable but deserves a look. Structural problems in the file
+itself — ragged rows, duplicate or blank header names, an unterminated quote —
+are reported separately when the file loads.
 
-## Validation Rules
+## What it computes
 
-The application can flag:
+- **GSI** = 100 × gonad mass / somatic mass
+- **HSI** = 100 × liver mass / somatic mass
 
-- duplicate specimen identifiers;
-- missing required values;
-- nonnumeric measurements;
-- zero or negative measurements;
-- organ or somatic mass exceeding total body mass.
+Both use somatic mass as the denominator. That is a convention, not the only
+one in use; confirm it matches your protocol before reporting these numbers.
+The interface states how many rows each index could be computed for.
 
-Flagged observations are not automatically deleted. They remain available for local review so that scientific decisions are documented rather than silently automated.
+- **Group summaries** (n, mean, SD, median, min, max) for every combination of
+  the grouping fields you tick, plus a count of flagged rows per group.
+- **A least-squares regression** of the outcome on the predictors you choose,
+  optionally on a log scale, reported with standard errors, t-statistics, R²
+  and adjusted R².
 
-## Technical Details
+## The analysis plan
 
-- JavaScript
-- HTML
-- CSS
-- Client-side CSV parsing
-- Configurable data mapping
-- Descriptive statistics
-- Ordinary least-squares regression
-- Canvas-based visualization
-- Local report generation
+Step 3 is where you say what should be computed:
 
-## Repository Contents
+- **Grouping fields** — any columns; summaries are reported per combination.
+- **Outcome variable** — any numeric column, or the derived GSI or HSI.
+- **Predictor variables** — one or more numeric variables (more than one gives
+  a multiple regression).
+- **Log transform** — when ticked, variables whose values are all positive are
+  log-transformed. A variable containing a zero or a negative value is left on
+  its original scale and the reason is reported. Rows are never dropped to make
+  a logarithm possible.
 
-```text
-.
-├── index.html
-├── synthetic_example.csv
-├── README.md
-├── LICENSE
-└── screenshots/
-    └── analyzer-demo.png
-```
+The plan is echoed above the results, and included in the downloadable summary,
+so any number can be traced back to the choices that produced it.
 
-The exact structure may include separate JavaScript, CSS, test, or source files if the application has been modularized.
+## The governance and reproducibility report
 
-## Scientific Limitations
+Step 6 produces a **Research Data Governance and Reproducibility Report**: an
+aggregate account of what was analysed and how, meant to travel to a colleague,
+a supervisor or a reviewer without the data travelling with it.
 
-The built-in model is an exploratory starting point, not an automatic final scientific analysis. A complete analysis may require:
+It records the application version, the analysis timestamp, the row and column
+counts, the column mappings, per-column missingness percentages, the validation
+rules applied together with their aggregate flag counts, the transformations
+applied, the grouping variables, the outcome and predictor variables, a
+description of the statistical model, and the limitations and interpretation
+warnings that apply to it.
 
-- mixed-effects modelling;
-- site- or year-level sampling structure;
-- model diagnostics;
+It does **not** record raw rows, specimen identifiers, file names, or any
+individual value. Group summaries carry only a count, a mean and a standard
+deviation: a minimum or a maximum is not a summary at all but one specimen's
+recorded measurement, and a median is the same whenever the group size is odd.
+
+Step 5 is an optional project-information form — project title, dataset owner
+or custodian, intended scientific use, prohibited uses, permission or consent
+status, retention and deletion plan, known sampling limitations, and potential
+sources of bias. Every field is optional; blank answers are reported as
+`(not stated)` rather than omitted, so the report shows what was asked as well
+as what was answered. Nothing typed here is checked against the data.
+
+Download it as **JSON** (for archiving or machine reading) or as a **standalone
+HTML file** (one self-contained document with no scripts and no external
+references, which opens correctly offline on any machine).
+
+Given the same file, the same plan and the same timestamp, the report is
+byte-identical every time — the timestamp is the only thing that varies between
+runs, which is what makes a report reproducible rather than merely repeatable.
+
+## Tests
+
+Two runners execute the same test cases:
+
+- **In a browser:** double-click `tests.html`. No server, no installation.
+- **On the command line:** `node tests/run-tests.js`.
+
+The browser runner executes 92 cases; the command-line runner executes 116. The
+extra 24 are the ones that must read files, which a double-clicked page is not
+allowed to do: an end-to-end pass over `synthetic_example.csv`, the governance
+report built from that file, and a scan of the source files for anything that
+could reach the network.
+
+`synthetic_example.csv` is invented data for testing. It deliberately contains
+one duplicated specimen ID and one gonad mass larger than the body mass, so the
+flagging can be seen working.
+
+## Scientific limitations
+
+The regression is an exploratory, descriptive starting point. **No p-values are
+reported**, because this tool cannot check the assumptions that would make them
+meaningful, and nothing it prints establishes a biological effect.
+
+A final research analysis may require:
+
+- mixed-effects models;
+- site-level replication checks;
+- date or year effects;
 - sex-specific models;
 - nonlinear terms;
+- residual diagnostics;
 - sensitivity analyses;
-- multiple-comparison correction;
-- biological review of every exclusion rule.
+- multiple-comparison control.
 
-Observational associations should not be interpreted automatically as causal effects.
+Those should be added only after the biological design and variable definitions
+are confirmed.
 
-## Data Availability
-
-The repository includes synthetic data only. Confidential research data and unpublished results are not publicly available.
-
-## License
-
-MIT License
+See `TECHNICAL_REPORT.md` for the architecture, the validation rules and the
+test inventory.

@@ -155,3 +155,33 @@ code { background: #eef3f7; padding: 2px 5px; border-radius: 5px; }
 ul.plain { margin: 6px 0; padding-left: 20px; font-size: .88rem; color: #53616e; }
 
 .actions { margin-top: 15px; }
+
+/* Project-information form and report preview */
+textarea {
+  font: inherit;
+  padding: 10px;
+  border: 1px solid #b9c4ce;
+  border-radius: 9px;
+  background: #fff;
+  min-height: 72px;
+  resize: vertical;
+}
+
+.field-hint { font-weight: 400; color: #7c8894; font-size: .82rem; }
+
+#projectForm label { margin-bottom: 14px; }
+
+.report-preview {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid #dfe6ec;
+  border-radius: 10px;
+  background: #fbfcfd;
+  padding: 12px 14px;
+  margin-top: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

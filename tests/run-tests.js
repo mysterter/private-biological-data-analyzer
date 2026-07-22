@@ -24,9 +24,11 @@ require(path.join(projectRoot, "js", "csv.js"));
 require(path.join(projectRoot, "js", "stats.js"));
 require(path.join(projectRoot, "js", "validate.js"));
 require(path.join(projectRoot, "js", "analysis.js"));
+require(path.join(projectRoot, "js", "report.js"));
 
 require(path.join(__dirname, "harness.js"));
 require(path.join(__dirname, "test-cases.js"));
+require(path.join(__dirname, "report-cases.js"));
 
 const PBA = globalThis.PBA;
 const test = PBA.testing.test;
@@ -143,6 +145,106 @@ test("Synthetic file", "the flag report lists one line per flag", (t) => {
 });
 
 /* ------------------------------------------------------------------------ */
+/* The governance report, built from the synthetic example file.             */
+/* ------------------------------------------------------------------------ */
+
+/** Every specimen identifier that appears in the synthetic file. */
+const SYNTHETIC_IDS = syntheticText.trim().split("\n").slice(1)
+  .map((line) => line.split(",")[0]).filter(Boolean);
+
+function syntheticReport(now) {
+  const { parsed, mapping, records, profiles } = loadSynthetic();
+  const plan = PBA.analysis.defaultPlan(mapping, profiles, records);
+  const result = PBA.analysis.runAnalysis(records, plan);
+  return PBA.report.buildGovernanceReport(
+    { parsed, mapping, records, plan, result, project: PBA.report.emptyProject() },
+    { now: now || new Date("2026-07-21T12:00:00.000Z") });
+}
+
+test("Synthetic file: report", "no specimen identifier reaches either export", (t) => {
+  const built = syntheticReport();
+  const json = PBA.report.reportToJSON(built);
+  const html = PBA.report.reportToHTML(built);
+
+  t.equal(SYNTHETIC_IDS.length, 61, "the file supplies 61 identifiers to check");
+  const leakedJson = SYNTHETIC_IDS.filter((id) => json.indexOf(id) >= 0);
+  const leakedHtml = SYNTHETIC_IDS.filter((id) => html.indexOf(id) >= 0);
+  t.deepEqual(leakedJson, [], "no identifier appears in the JSON export");
+  t.deepEqual(leakedHtml, [], "no identifier appears in the HTML export");
+});
+
+test("Synthetic file: report", "the file name never reaches the export", (t) => {
+  const json = PBA.report.reportToJSON(syntheticReport());
+  t.ok(json.indexOf("synthetic_example") < 0, "the file name is absent");
+  t.ok(json.indexOf(".csv") < 0, "no file name of any kind is present");
+});
+
+test("Synthetic file: report", "counts and mappings describe the real file", (t) => {
+  const built = syntheticReport();
+  t.equal(built.dataset.rows, 61);
+  t.equal(built.dataset.columns, 9);
+  t.equal(built.column_mappings.specimen_id, "specimen_id");
+  t.equal(built.column_mappings.length, "total_length_mm");
+  t.equal(built.validation.rows_with_any_flag, 3, "two duplicates and one impossible mass");
+  t.equal(built.validation.rows_with_errors, 0);
+  t.equal(built.application.version, PBA.meta.version);
+});
+
+test("Synthetic file: report", "the file is complete, so missingness is zero throughout", (t) => {
+  const built = syntheticReport();
+  t.equal(built.dataset.missingness.length, 9, "one entry per column");
+  built.dataset.missingness.forEach((entry) => {
+    t.equal(entry.missing, 0, entry.column + " has no blank values");
+    t.equal(entry.missing_percent, 0);
+    t.equal(entry.present, 61);
+  });
+});
+
+test("Synthetic file: report", "no group falls below the suppression threshold", (t) => {
+  const built = syntheticReport();
+  t.equal(built.group_summary.groups.length, 6, "six groups are reported");
+  t.equal(built.group_summary.groups_withheld, 0);
+  t.equal(built.group_summary.records_withheld, 0);
+  built.group_summary.groups.forEach((group) => {
+    t.ok(group.n >= 5, "group " + group.group + " holds at least five records");
+  });
+  t.equal(built.group_summary.groups.reduce((sum, g) => sum + g.n, 0), 61,
+    "with nothing withheld the counts add back up to every row");
+});
+
+test("Synthetic file: report", "the same file and timestamp give byte-identical output", (t) => {
+  t.equal(PBA.report.reportToJSON(syntheticReport()),
+          PBA.report.reportToJSON(syntheticReport()),
+          "the JSON export is reproducible");
+  t.equal(PBA.report.reportToHTML(syntheticReport()),
+          PBA.report.reportToHTML(syntheticReport()),
+          "the HTML export is reproducible");
+});
+
+test("Synthetic file: report", "the model in the report matches the analysis", (t) => {
+  const built = syntheticReport();
+  const model = built.statistical_model;
+  t.ok(model.fitted);
+  t.equal(model.observations, 61);
+  t.equal(model.terms.length, 2, "an intercept and one slope");
+
+  const rows = syntheticText.trim().split("\n").slice(1).map((line) => line.split(","));
+  const expected = PBA.stats.simpleOLS(
+    rows.map((cells) => Math.log(Number(cells[1]))),
+    rows.map((cells) => Math.log(Number(cells[2]))));
+  t.close(model.estimates[1], expected.slope, 1e-9,
+    "the reported slope matches a separate calculation from the raw file");
+});
+
+test("Synthetic file: report", "building the report reaches no network API", (t) => {
+  const before = PBA.privacy.blockedAttempts().length;
+  const built = syntheticReport();
+  PBA.report.reportToJSON(built);
+  PBA.report.reportToHTML(built);
+  t.equal(PBA.privacy.blockedAttempts().length, before, "no attempt was made or blocked");
+});
+
+/* ------------------------------------------------------------------------ */
 /* Source scan: the privacy rule, checked against the files themselves.      */
 /* ------------------------------------------------------------------------ */
 
@@ -155,9 +257,11 @@ const SOURCE_FILES = [
   "js/stats.js",
   "js/validate.js",
   "js/analysis.js",
+  "js/report.js",
   "js/ui.js",
   "tests/harness.js",
   "tests/test-cases.js",
+  "tests/report-cases.js",
   "tests/browser-runner.js"
 ].filter((relative) => fs.existsSync(path.join(projectRoot, relative)));
 
@@ -191,7 +295,8 @@ test("Privacy: source scan", "no external script, stylesheet, font or image is l
 
 test("Privacy: source scan", "only privacy.js and the tests mention network APIs", (t) => {
   const pattern = /\b(fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|RTCPeerConnection)\b/;
-  const allowed = ["js/privacy.js", "tests/test-cases.js", "tests/run-tests.js", "tests/browser-runner.js"];
+  const allowed = ["js/privacy.js", "tests/test-cases.js", "tests/report-cases.js",
+                   "tests/run-tests.js", "tests/browser-runner.js"];
   SOURCE_FILES.forEach((relative) => {
     if (allowed.indexOf(relative) >= 0) return;
     t.notOk(pattern.test(readSource(relative)),
@@ -229,7 +334,7 @@ test("Privacy: source scan", "the app loads only local scripts, in a fixed order
   const sources = Array.from(html.matchAll(/<script[^>]+src="([^"]+)"/g)).map((m) => m[1]);
   t.deepEqual(sources, [
     "js/privacy.js", "js/csv.js", "js/stats.js",
-    "js/validate.js", "js/analysis.js", "js/ui.js"
+    "js/validate.js", "js/analysis.js", "js/report.js", "js/ui.js"
   ], "privacy.js must be first so the kill switch is installed before anything else");
   t.notOk(/type="module"/.test(html),
     "ES modules would break the double-click launch from a file:// page");

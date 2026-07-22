@@ -1,6 +1,7 @@
 # Technical report
 
-Private Biological CSV Analyzer — architecture, validation, tests and privacy.
+Private Biological CSV Analyzer 1.1.0 — architecture, validation logic,
+governance reporting, tests and privacy safeguards.
 
 ## 1. Architecture
 
@@ -33,20 +34,22 @@ browser and under Node for testing.
 | `js/csv.js` | CSV parsing (a character-level state machine) and CSV writing. |
 | `js/stats.js` | Numeric conversion, descriptive statistics, simple and multiple OLS. |
 | `js/validate.js` | Field definitions, column-mapping guesses, record construction, quality flags, GSI/HSI. |
-| `js/analysis.js` | Column profiling, the analysis plan, transforms, grouping, model execution. |
+| `js/analysis.js` | Column profiling, the analysis plan, transforms, grouping, small-group suppression, model execution. |
+| `js/report.js` | The governance and reproducibility report: project-form definition, report construction, JSON and standalone-HTML rendering. |
 | `js/ui.js` | The only module that touches the DOM: screens, tables, canvas plot, downloads. |
 | `css/app.css` | All styling. Kept in a file so the policy need not allow inline styles. |
 
 Dependencies run one way, in load order: `csv` and `stats` are self-contained,
 `validate` uses `stats`, `analysis` uses `stats` and the records `validate`
-produced, and `ui` uses all of them. The first five modules are pure functions
-over plain data and carry no DOM references, which is what makes them directly
-testable in Node.
+produced, `report` uses `validate` and `analysis`, and `ui` uses all of them.
+Every module except `ui` is a pure function over plain data and carries no DOM
+reference, which is what makes them directly testable in Node.
 
 ### 1.3 Flow
 
 ```
-select file → parse → map columns → build + flag records → analysis plan → run → results
+select file → parse → map columns → build + flag records → analysis plan → run
+    → results → project information (optional) → governance report → download
 ```
 
 Each step is a separate card in the page, revealed as the previous one
@@ -137,6 +140,84 @@ The results screen states this in place, next to the coefficients, and the
 downloadable summary carries the same note. The tool describes what is in the
 file; it does not interpret it, and it makes no biological claim.
 
+## 3a. The governance and reproducibility report
+
+### 3a.1 Privacy by construction
+
+The report builder is a pure function that is handed the parsed file structure,
+the column mappings, the flagged records, the plan and the analysis result. It
+is **not** handed the file name, and it never iterates rows into output. There
+is consequently no code path by which a specimen identifier, an individual
+value or a file name could reach an export — the guarantee comes from what is
+passed in, not from a filter applied on the way out.
+
+Two disclosure risks needed handling beyond that:
+
+- **Group labels.** A label is derived from the grouping-field values, so
+  grouping by specimen ID would produce one group per animal with the
+  identifier as its label. Blanking the statistics but keeping the row would
+  still publish the identifier. Small groups are therefore removed **entirely**
+  — label included — and replaced by a count of how many groups and records
+  were withheld.
+- **Group extremes.** A minimum or maximum is not an aggregate: it is exactly
+  one specimen's recorded measurement. A median is the same whenever the group
+  size is odd. Exported group statistics are therefore restricted to the count,
+  the mean and the standard deviation. This was caught by a test asserting that
+  a distinctive raw measurement never appears in an export; the test failed
+  against the first implementation, which reported minima and maxima, and the
+  report was changed rather than the test.
+
+The same disclosure-safe projection is applied to the older
+`aggregate_analysis_summary.json` export, and the file name was removed from it,
+so both export paths honour one rule.
+
+### 3a.2 Reproducibility
+
+`buildGovernanceReport(inputs, { now })` takes its timestamp as a parameter
+instead of reading the clock. Identical inputs and an identical `now` therefore
+produce byte-identical JSON and HTML, which the tests assert directly. A
+separate test builds the same analysis at two different timestamps, blanks the
+timestamp field, and asserts the remainder is unchanged — so the clock is
+demonstrably the only source of variation.
+
+The report echoes everything needed to repeat the work: application version,
+column mappings, transformations, the plan, the model specification and the
+population the model was fitted to.
+
+### 3a.3 Contents
+
+Application version and timestamp; row and column counts and column names;
+per-column missingness (present, missing, percentage); the column mappings; the
+derived-index definitions and their coverage; the validation rules applied with
+their aggregate flag counts and the no-deletion policy; the analysis plan with
+grouping variables, outcome and predictors; the transformations and why each was
+or was not applied; the rows used and excluded by the model with reasons; the
+model description and estimates; the suppressed group summary; the limitations
+and interpretation warnings; and the privacy safeguards in force.
+
+The limitation and warning text is fixed and describes what the tool does not
+establish. It contains no statement about the data, so the report cannot assert
+a finding.
+
+### 3a.4 The project-information form
+
+Eight optional fields — title, custodian, intended use, prohibited uses,
+permission or consent status, retention and deletion plan, sampling limitations,
+potential sources of bias. They are defined once, in `report.PROJECT_FIELDS`,
+and the interface generates the form from that list while the report reads it
+back through the same list, so the questions asked and the questions recorded
+cannot drift apart. Unanswered fields are reported as `(not stated)` rather than
+dropped, so a reader can see what was left blank. All values are HTML-escaped on
+export; a test confirms that a `<script>` tag typed into a field is rendered as
+text.
+
+### 3a.5 The standalone HTML export
+
+One self-contained document: inline CSS, no scripts, no external references, and
+its own `default-src 'none'` policy. It renders identically offline. A test
+asserts the absence of absolute URLs, `<script>`, `<link>`, `@import` and
+`url(...)`.
+
 ## 4. Tests
 
 No external test framework is used — that would require a package manager and
@@ -145,10 +226,10 @@ runner. The same cases run in two places:
 
 | Runner | How | Cases |
 | --- | --- | --- |
-| Browser | double-click `tests.html` | 59 |
-| Node | `node tests/run-tests.js` | 75 |
+| Browser | double-click `tests.html` | 92 |
+| Node | `node tests/run-tests.js` | 116 |
 
-The 16 extra cases in Node are the ones that must read files, which a
+The 24 extra cases in Node are the ones that must read files, which a
 double-clicked page is not permitted to do.
 
 ### Coverage by area
@@ -166,9 +247,17 @@ double-clicked page is not permitted to do.
 | Multiple regression | exact recovery of a linear combination; agreement with the closed-form simple regression; refusal on collinearity and on too few rows |
 | Analysis plan | plan validation; transform applied and skipped; no rows dropped for a logarithm; excluded rows counted and explained; grouping including `(missing)`; derived indices as variables; column profiling; the default plan |
 | Data integrity | one record per input row, whatever the data contains |
+| Report: no identifiers | no specimen ID in the JSON or HTML export; grouping by specimen ID leaks nothing; no individual measurement appears; group statistics exclude minimum, maximum and median; no file-name field exists |
+| Report: suppression | a group below the threshold is withheld with its label; a distinctive small-group label appears in neither export; a group of exactly five is reported; the shared helper honours a custom threshold; suppression does not change the model |
+| Report: missingness | percentages against a hand-counted fixture; whitespace counts as missing; every column reported; rounding to two decimals; an empty dataset yields `null` rather than a division by zero |
+| Report: no network | building and exporting triggers no blocked API; the HTML export has no URL, script, link, import or asset reference and declares its own policy; the export records that no request was made |
+| Report: reproducibility | identical inputs give byte-identical JSON and HTML; only the timestamp differs between two runs; a different plan gives a different report; the injected timestamp is used |
+| Report: contents | every required section present; only mapped columns listed; flag counts match the validation summary; a refused model is described rather than omitted; no `NaN` reaches the JSON |
+| Report: project form | an empty form reads as unanswered; answers carried verbatim; all eight questions asked; typed markup cannot inject into the HTML export |
 | Privacy | network APIs refuse and record the attempt; a full analysis triggers none |
 | Source scan (Node) | no external address, script, stylesheet or asset; network APIs mentioned only where expected; the CSP declares `connect-src 'none'`; no storage APIs; only the user-selected file is read; scripts load locally in a fixed order with `privacy.js` first and no ES modules |
 | Synthetic file (Node) | automatic column recognition; 61 rows in, 61 records out; the planted duplicate ID and the planted impossible organ mass found; no unusable rows; index coverage; the default plan cross-checked against an independent calculation from the raw text |
+| Synthetic file report (Node) | none of the file's 61 identifiers appears in either export; no file name appears; counts and mappings match the file; missingness is zero throughout; no group falls below the threshold and the kept counts sum to 61; the same file and timestamp give byte-identical output; the reported slope matches an independent calculation; building the report reaches no network API |
 
 ### Result
 
@@ -205,26 +294,40 @@ operates. There is no drag-and-drop handler, no `showDirectoryPicker`, no
 open a file the user did not select, which is also why the browser test page
 cannot run the synthetic-file checks.
 
+5. **Disclosure control on exports.** Group summaries covering fewer than five
+   records are withheld along with their labels, on screen and in every export.
+   Exported group statistics are limited to count, mean and standard deviation.
+   File names are never passed to a report builder. The one export that does
+   carry identifiers is the flagged-row CSV, whose entire purpose is local
+   review of specific rows.
+
 **Downloads** are built in memory as a `Blob` and handed to the browser's own
-save mechanism; no network is involved.
+save mechanism; no network is involved. The standalone HTML report carries its
+own `default-src 'none'` policy and contains no scripts or external references,
+so a shared copy cannot call home either.
 
 ## 6. Verification performed
 
 | Check | Result |
 | --- | --- |
-| `node tests/run-tests.js` | 75 passed, 0 failed |
-| `tests.html` in Chrome from `file://` | 59 passed, 0 failed |
-| `tests.html` in Safari from `file://` | 59 passed, 0 failed |
-| `index.html` in Chrome from `file://` | loads, all six modules present, no console errors, no CSP violations |
+| `node tests/run-tests.js` | 116 passed, 0 failed |
+| `tests.html` in Chrome from `file://` | 92 passed, 0 failed |
+| `tests.html` in Safari from `file://` | 92 passed, 0 failed |
+| `index.html` in Chrome from `file://` | loads, all seven modules present, no console errors, no CSP violations |
 | `index.html` in Safari from `file://` | loads and runs |
 | End-to-end with `synthetic_example.csv` | 61 rows, 60 unique IDs, 3 flagged rows, model n = 61, R² = 0.964 |
+| Governance report, end to end | 8-field form rendered; downloads disabled until generated; JSON and standalone HTML both produced as `blob:` with no network; 17 sections; typed markup escaped |
+| Identifier leakage across all exports | none of the 61 identifiers appears in the governance JSON, the governance HTML, or the aggregate summary; no file name in any of them |
+| Small-group suppression, end to end | grouping by specimen ID withheld all 60 groups covering 61 records, on screen and in both exports, while the model still used all 61 rows |
 | Network activity during a full session | zero requests; only local `file://` reads of the app's own files |
 | Blocked network attempts during a full session | zero |
 
-The end-to-end run was performed by driving the real interface: selecting the
-file, mapping columns, opening the analysis plan, running it, changing the plan
-(multiple predictors, log transform off, GSI as the outcome), triggering both
-validation errors, and generating both downloads.
+The end-to-end runs were performed by driving the real interface in a fresh
+browser: selecting the file, mapping columns, opening the analysis plan, running
+it, changing the plan (multiple predictors, log transform off, GSI as the
+outcome), triggering both validation errors, filling the project-information
+form, generating the governance report, and capturing what each of the four
+download buttons would save.
 
 ## 7. Known limitations
 
@@ -241,5 +344,12 @@ validation errors, and generating both downloads.
   unusable.
 - Dates are mapped but not parsed or used; date and year effects are listed in
   the README as work for a real statistical package.
+- Small-group suppression uses a fixed threshold of five and applies only to
+  group summaries. It is a sensible default, not a formal disclosure-control
+  guarantee: it does not defend against differencing attacks that combine
+  several reports built from overlapping subsets of the same dataset.
+- The project-information form is recorded as typed. Nothing in it is validated
+  or checked against the data, and a claim entered there carries no more weight
+  than the person who typed it.
 - The tool has been verified on Chrome and Safari on macOS. It uses no
   browser-specific APIs, but has not been run on Firefox or on Windows.

@@ -17,15 +17,19 @@
   var stats = PBA.stats;
   var validate = PBA.validate;
   var analysis = PBA.analysis;
+  var report = PBA.report;
 
   var state = {
+    /* Held only to show the user what they opened. It is deliberately never
+       passed to the report builder, so it cannot reach an exported file. */
     fileName: "",
     parsed: null,
     records: [],
     profiles: [],
     mapping: {},
     plan: null,
-    result: null
+    result: null,
+    report: null
   };
 
   /* ---------------------------------------------------------------- helpers */
@@ -320,6 +324,11 @@
     setStatus("planStatus", "", "");
     renderResults();
     show("stepResults");
+    /* Any previous report described a different plan, so it is discarded
+       rather than left downloadable next to fresh results. */
+    invalidateReport();
+    show("stepProject");
+    show("stepReport");
     $("stepResults").scrollIntoView({ behavior: "smooth" });
   }
 
@@ -487,7 +496,9 @@
   }
 
   function renderGroups(result) {
-    var groups = result.groups;
+    /* Suppression is applied to the screen as well as to the exports: a
+       screenshot of a small group discloses just as much as a file. */
+    var groups = analysis.suppressSmallGroups(result.groups);
     var headers = ["Group", { text: "n", numeric: true }, { text: "Flagged rows", numeric: true }];
     groups.variables.forEach(function (name) {
       headers.push({ text: analysis.variableLabel(name) + " mean", numeric: true });
@@ -506,7 +517,111 @@
       return row;
     });
 
-    buildTable($("groupTable"), headers, rows, "No groups to summarise.");
+    buildTable($("groupTable"), headers, rows,
+      groups.suppressedGroupCount
+        ? "Every group was withheld: none reached " + groups.threshold + " records."
+        : "No groups to summarise.");
+
+    var notice = clear($("groupNotice"));
+    if (groups.suppressedGroupCount) {
+      notice.appendChild(el("div", {
+        className: "note caution",
+        text: groups.suppressedGroupCount + " group(s) covering " +
+              groups.suppressedRecordCount + " record(s) are not shown. " + groups.note
+      }));
+    }
+  }
+
+  /* ------------------------------------------- step 5: project information */
+
+  /* The form is generated from report.PROJECT_FIELDS so that the questions
+     asked and the questions recorded can never drift apart. */
+  function renderProjectForm() {
+    var target = clear($("projectForm"));
+
+    report.PROJECT_FIELDS.forEach(function (field) {
+      var wrap = el("label", { htmlFor: "project_" + field.key });
+      wrap.appendChild(doc.createTextNode(field.label + " "));
+      wrap.appendChild(el("span", { className: "field-hint", text: field.hint }));
+
+      var input;
+      if (field.type === "select") {
+        input = el("select", { id: "project_" + field.key });
+        field.options.forEach(function (option) {
+          input.appendChild(el("option", { value: option, text: option }));
+        });
+      } else if (field.type === "textarea") {
+        input = el("textarea", { id: "project_" + field.key });
+      } else {
+        input = el("input", { type: "text", id: "project_" + field.key });
+      }
+      wrap.appendChild(input);
+      target.appendChild(wrap);
+    });
+  }
+
+  function readProjectInfo() {
+    var project = {};
+    report.PROJECT_FIELDS.forEach(function (field) {
+      var node = $("project_" + field.key);
+      project[field.key] = node ? node.value : "";
+    });
+    return project;
+  }
+
+  function clearProjectForm() {
+    var blank = report.emptyProject();
+    report.PROJECT_FIELDS.forEach(function (field) {
+      var node = $("project_" + field.key);
+      if (node) node.value = blank[field.key];
+    });
+  }
+
+  /* ------------------------------- step 6: governance and reproducibility */
+
+  function setReportDownloadsEnabled(enabled) {
+    $("downloadReportJson").disabled = !enabled;
+    $("downloadReportHtml").disabled = !enabled;
+  }
+
+  function onGenerateReport() {
+    if (!state.result || !state.result.ok) {
+      setStatus("reportStatus", "Run an analysis first.", "bad");
+      return;
+    }
+
+    /* Note what is handed over: parsed structure, mappings, flagged records for
+       counting, the plan and the result. The file name is not among them. */
+    state.report = report.buildGovernanceReport({
+      parsed: state.parsed,
+      mapping: state.mapping,
+      records: state.records,
+      plan: state.plan,
+      result: state.result,
+      project: readProjectInfo()
+    });
+
+    setReportDownloadsEnabled(true);
+    setStatus("reportStatus",
+      "Report generated at " + state.report.generated_at +
+      ". Nothing was uploaded; both downloads are produced in this tab.", "good");
+
+    var preview = clear($("reportPreview"));
+    preview.appendChild(el("div", {
+      className: "small",
+      text: "Preview of the JSON export:"
+    }));
+    preview.appendChild(el("div", {
+      className: "report-preview",
+      text: report.reportToJSON(state.report)
+    }));
+  }
+
+  function invalidateReport() {
+    state.report = null;
+    setReportDownloadsEnabled(false);
+    clear($("reportPreview"));
+    setStatus("reportStatus", "", "");
   }
 
   /* ------------------------------------------------------------- the plot */
@@ -674,13 +789,15 @@
   function buildAggregateSummary() {
     var result = state.result;
     var coverage = validate.indexCoverage(state.records);
+    var suppressed = analysis.suppressSmallGroups(result.groups);
 
     return JSON.stringify({
-      tool: "Private Biological CSV Analyzer",
+      tool: PBA.meta.name,
+      application_version: PBA.meta.version,
       generated: new Date().toISOString(),
-      source_file: state.fileName,
       note: "Aggregate output only. Descriptive statistics and least-squares " +
-            "estimates for the stated plan; no inferential claim is made.",
+            "estimates for the stated plan; no inferential claim is made. " +
+            "The source file name is deliberately omitted.",
       rows_loaded: state.records.length,
       rows_with_flags: state.records.filter(function (r) { return r.flags.length; }).length,
       rows_with_errors: validate.countRowsWithSeverity(state.records, "error"),
@@ -708,7 +825,26 @@
         adjusted_r_squared: result.model.adjustedR2,
         residual_sd: result.model.residualSD
       } : { fitted: false, reason: result.model.reason },
-      group_summary: result.groups.summaries
+      /* Projected through the same disclosure-safe filter as the governance
+         report: a group minimum or maximum is one specimen's raw measurement. */
+      group_summary: suppressed.summaries.map(function (summary) {
+        var safe = {};
+        suppressed.variables.forEach(function (name) {
+          safe[analysis.variableLabel(name)] = report.disclosureSafeStats(summary.stats[name]);
+        });
+        return {
+          group: summary.group,
+          n: summary.n,
+          rows_with_flags: summary.flaggedRows,
+          statistics: safe
+        };
+      }),
+      group_suppression: {
+        threshold: suppressed.threshold,
+        groups_withheld: suppressed.suppressedGroupCount,
+        records_withheld: suppressed.suppressedRecordCount,
+        note: suppressed.note
+      }
     }, null, 2);
   }
 
@@ -716,6 +852,7 @@
 
   function init() {
     renderPrivacyStatus();
+    renderProjectForm();
 
     $("fileInput").addEventListener("change", onFileSelected);
     $("toPlanBtn").addEventListener("click", onContinueToPlan);
@@ -736,13 +873,29 @@
       if (!state.result) return;
       saveFile("aggregate_analysis_summary.json", buildAggregateSummary(), "application/json");
     });
+
+    $("clearProjectBtn").addEventListener("click", clearProjectForm);
+    $("generateReportBtn").addEventListener("click", onGenerateReport);
+
+    $("downloadReportJson").addEventListener("click", function () {
+      if (!state.report) return;
+      saveFile("governance_reproducibility_report.json",
+        report.reportToJSON(state.report), "application/json");
+    });
+    $("downloadReportHtml").addEventListener("click", function () {
+      if (!state.report) return;
+      saveFile("governance_reproducibility_report.html",
+        report.reportToHTML(state.report), "text/html");
+    });
   }
 
   /* Exposed so the browser test page can drive the same code path the user does. */
   PBA.ui = {
     state: state,
     buildFlagReport: buildFlagReport,
-    buildAggregateSummary: buildAggregateSummary
+    buildAggregateSummary: buildAggregateSummary,
+    readProjectInfo: readProjectInfo,
+    generateReport: onGenerateReport
   };
 
   if (doc.readyState === "loading") {

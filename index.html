@@ -99,12 +99,35 @@
 
 <h3>Grouped summary</h3>
 <div class="tablewrap"><table id="groupTable"></table></div>
+<div id="groupNotice"></div>
 
 <div class="actions">
 <button id="downloadValidation">Download flagged-row report</button>
 <button id="downloadSummary">Download aggregate summary</button>
 <button id="backToPlanBtn" class="secondary">Change the analysis plan</button>
 </div>
+</section>
+
+<section class="card hidden" id="stepProject">
+<h2>5. Project information <span class="small">(optional)</span></h2>
+<p class="small">Governance context for the report below. Every field is optional, nothing here is checked against the data, and what you type is used only to fill in the report you download. Leave a field blank and it is recorded as <code>(not stated)</code>.</p>
+<div id="projectForm" class="plan-columns"></div>
+<div class="actions">
+<button id="clearProjectBtn" class="secondary">Clear these fields</button>
+</div>
+</section>
+
+<section class="card hidden" id="stepReport">
+<h2>6. Governance and reproducibility report</h2>
+<p class="small">An aggregate record of what was analysed and how: application version, timestamp, row and column counts, column mappings, missingness, the validation rules applied and their flag counts, transformations, the analysis plan, the model, and the limitations that apply to it.</p>
+<div class="note"><strong>What this report never contains:</strong> raw rows, specimen identifiers, file names, or any individual value. It is built from counts and summaries only, and group summaries covering fewer than five records are withheld entirely.</div>
+<div class="actions">
+<button id="generateReportBtn">Generate report</button>
+<button id="downloadReportJson" class="secondary" disabled>Download JSON</button>
+<button id="downloadReportHtml" class="secondary" disabled>Download standalone HTML</button>
+</div>
+<div id="reportStatus" class="status small"></div>
+<div id="reportPreview"></div>
 </section>
 
 </main>
@@ -116,6 +139,7 @@
 <script src="js/stats.js"></script>
 <script src="js/validate.js"></script>
 <script src="js/analysis.js"></script>
+<script src="js/report.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>
