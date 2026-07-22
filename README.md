@@ -1,5 +1,7 @@
 # Private Biological CSV Analyzer
 
+**Version 1.1.0**
+
 A local tool for checking a biological specimen CSV and computing descriptive
 summaries and a regression you specify yourself. It runs in a browser tab on
 your own machine. Nothing is uploaded, and no internet connection is used.
@@ -21,6 +23,14 @@ required.
 
 Keep the whole folder together. `index.html` loads its code from the `js/` and
 `css/` folders next to it, so moving `index.html` on its own will not work.
+
+### Hosted-demo note
+
+A GitHub Pages copy necessarily downloads the static HTML, CSS and JavaScript
+files from GitHub when the page opens. The selected CSV is still processed in
+the browser and is not uploaded by the application, but confidential datasets
+should be analysed with a downloaded local copy opened from `index.html`.
+Use the hosted page only with synthetic, public or otherwise approved data.
 
 ## Privacy
 
@@ -90,8 +100,9 @@ Both use somatic mass as the denominator. That is a convention, not the only
 one in use; confirm it matches your protocol before reporting these numbers.
 The interface states how many rows each index could be computed for.
 
-- **Group summaries** (n, mean, SD, median, min, max) for every combination of
-  the grouping fields you tick, plus a count of flagged rows per group.
+- **Disclosure-safe group summaries** (group size, mean, SD, and flagged-row count)
+  for every combination of the grouping fields you tick. Groups containing fewer
+  than five records are withheld together with their labels.
 - **A least-squares regression** of the outcome on the predictors you choose,
   optionally on a log scale, reported with standard errors, t-statistics, R²
   and adjusted R².
