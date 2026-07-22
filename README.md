@@ -8,7 +8,13 @@ your own machine. Nothing is uploaded, and no internet connection is used.
 
 ## Application Preview
 
-![Private Biological CSV Analyzer using synthetic demonstration data](screenshots/analyzer-demo.png)
+### Local analysis workflow
+
+![Synthetic-data analysis workflow](screenshots/analyzer-workflow.png)
+
+### Governance and reproducibility reporting
+
+![Governance report generated from synthetic data](screenshots/governance-report.png)
 
 ## Easiest use
 
